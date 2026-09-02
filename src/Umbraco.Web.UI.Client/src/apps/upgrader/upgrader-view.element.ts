@@ -91,6 +91,7 @@ export class UmbUpgraderViewElement extends LitElement {
 				display: grid;
 				place-items: center;
 				height: 100vh;
+				height: 100dvh;
 			}
 			.error {
 				color: var(--uui-color-danger);

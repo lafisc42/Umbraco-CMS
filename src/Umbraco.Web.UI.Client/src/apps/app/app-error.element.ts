@@ -213,6 +213,7 @@ export class UmbAppErrorElement extends UmbLitElement {
 				background-image: url('/umbraco/backoffice/assets/installer-illustration.svg');
 				width: 100vw;
 				height: 100vh;
+				height: 100dvh;
 			}
 
 			#logo {
@@ -229,6 +230,7 @@ export class UmbAppErrorElement extends UmbLitElement {
 				justify-content: center;
 				width: 100vw;
 				height: 100vh;
+				height: 100dvh;
 			}
 
 			#box {

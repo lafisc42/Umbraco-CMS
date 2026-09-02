@@ -38,6 +38,16 @@ export class UmbFooterLayoutElement extends LitElement {
 				margin: 0 var(--uui-size-layout-1);
 				margin-left: auto;
 			}
+
+			@media (max-width: 800px) {
+				:host {
+					overflow-x: auto;
+				}
+
+				#actions {
+					margin-right: var(--uui-size-space-3);
+				}
+			}
 		`,
 	];
 }
