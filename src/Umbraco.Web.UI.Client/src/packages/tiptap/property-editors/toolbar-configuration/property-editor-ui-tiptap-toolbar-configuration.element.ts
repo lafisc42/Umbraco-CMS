@@ -440,6 +440,11 @@ export class UmbPropertyEditorUiTiptapToolbarConfigurationElement
 									opacity: 1;
 								}
 							}
+							@media (hover: none) {
+								> uui-action-bar {
+									opacity: 1;
+								}
+							}
 						}
 					}
 				}

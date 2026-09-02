@@ -367,6 +367,11 @@ export class UmbBlockRteEntryElement extends UmbLitElement implements UmbPropert
 			:host(:focus-within) {
 				--umb-block-entry-actions-opacity: 1;
 			}
+			@media (hover: none) {
+				:host {
+					--umb-block-entry-actions-opacity: 1;
+				}
+			}
 
 			:host(.ProseMirror-selectednode) {
 				--uui-color-default-contrast: initial;

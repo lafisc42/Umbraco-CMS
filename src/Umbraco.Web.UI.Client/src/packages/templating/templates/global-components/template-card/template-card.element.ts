@@ -108,6 +108,11 @@ export class UmbTemplateCardElement extends UUIFormControlWithBasicsMixin(UmbLit
 			:host(:hover) slot[name='actions'] {
 				opacity: 1;
 			}
+			@media (hover: none) {
+				slot[name='actions'] {
+					opacity: 1;
+				}
+			}
 
 			#open-part {
 				border: none;

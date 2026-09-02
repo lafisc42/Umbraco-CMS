@@ -453,6 +453,11 @@ export class UmbBlockListEntryElement extends UmbLitElement implements UmbProper
 			:host(:focus-within) {
 				--umb-block-list-entry-actions-opacity: 1;
 			}
+			@media (hover: none) {
+				:host {
+					--umb-block-list-entry-actions-opacity: 1;
+				}
+			}
 
 			:host::after {
 				content: '';
