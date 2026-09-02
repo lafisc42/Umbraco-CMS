@@ -1,5 +1,5 @@
 import { umbExtensionsRegistry } from '@umbraco-cms/backoffice/extension-registry';
-import { UmbBasicState, UmbStringState } from '@umbraco-cms/backoffice/observable-api';
+import { UmbBasicState, UmbBooleanState, UmbStringState } from '@umbraco-cms/backoffice/observable-api';
 import { UmbContextBase } from '@umbraco-cms/backoffice/class-api';
 import { UmbContextToken } from '@umbraco-cms/backoffice/context-api';
 import { UmbExtensionsManifestInitializer } from '@umbraco-cms/backoffice/extension-api';
@@ -20,6 +20,13 @@ export class UmbBackofficeContext extends UmbContextBase {
 
 	readonly #version = new UmbStringState(undefined);
 	public readonly version = this.#version.asObservable();
+
+	/**
+	 * Whether the section sidebar is shown as an open drawer on compact layouts.
+	 * Has no effect on layouts wide enough to show the sidebar permanently.
+	 */
+	readonly #sectionSidebarDrawerOpen = new UmbBooleanState(false);
+	public readonly sectionSidebarDrawerOpen = this.#sectionSidebarDrawerOpen.asObservable();
 
 	constructor(host: UmbControllerHost) {
 		super(host, UMB_BACKOFFICE_CONTEXT);
@@ -71,6 +78,14 @@ export class UmbBackofficeContext extends UmbContextBase {
 
 	public setActiveSectionAlias(alias: string) {
 		this.#activeSectionAlias.setValue(alias);
+	}
+
+	public toggleSectionSidebarDrawer() {
+		this.#sectionSidebarDrawerOpen.setValue(!this.#sectionSidebarDrawerOpen.getValue());
+	}
+
+	public closeSectionSidebarDrawer() {
+		this.#sectionSidebarDrawerOpen.setValue(false);
 	}
 
 	public async serverUpgradeCheck() {

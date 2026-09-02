@@ -483,6 +483,7 @@ declare global {
 		content_isPublished: string;
 		content_isSensitiveValue: string;
 		content_isSensitiveValue_short: string;
+		content_isSensitiveValueNotice: string;
 		content_itemChanged: string;
 		content_itemNotPublished: string;
 		content_languagesToPublish: string;
@@ -1137,6 +1138,7 @@ declare global {
 		general_manifest: string;
 		general_media: string;
 		general_mediaPicker: string;
+		general_menu: string;
 		general_message: string;
 		general_move: string;
 		general_name: string;
