@@ -1,8 +1,18 @@
 import type { ManifestSection, UmbSectionElement } from '../types.js';
 import type { ManifestSectionRoute } from '../extensions/section-route.extension.js';
 import UmbSectionMainViewElement from '../section-main-views/section-main-views.element.js';
+import { UMB_BACKOFFICE_CONTEXT } from '../../../../apps/backoffice/backoffice.context.js';
+import type { UmbBackofficeContext } from '../../../../apps/backoffice/backoffice.context.js';
 import { aliasToPath } from '@umbraco-cms/backoffice/utils';
-import { css, customElement, html, nothing, repeat, state } from '@umbraco-cms/backoffice/external/lit';
+import {
+	css,
+	customElement,
+	html,
+	nothing,
+	repeat,
+	state,
+	type PropertyValues,
+} from '@umbraco-cms/backoffice/external/lit';
 import {
 	createExtensionApi,
 	createExtensionElement,
@@ -33,8 +43,56 @@ export class UmbDefaultSectionElement extends UmbLitElement implements UmbSectio
 	@state()
 	private _splitPanelPosition = '300px';
 
+	@state()
+	private _isCompactLayout = false;
+
+	@state()
+	private _sidebarDrawerOpen = false;
+
+	#backofficeContext?: UmbBackofficeContext;
+	#compactLayoutQuery = window.matchMedia('(max-width: 800px)');
+
+	#onCompactLayoutChange = (event: MediaQueryListEvent) => {
+		this._isCompactLayout = event.matches;
+		if (!event.matches) {
+			this.#backofficeContext?.closeSectionSidebarDrawer();
+		}
+	};
+
+	#onSidebarDrawerClick = (event: Event) => {
+		const followsLink = event
+			.composedPath()
+			.some((target) => target instanceof HTMLAnchorElement && target.hasAttribute('href'));
+		if (followsLink) {
+			this.#backofficeContext?.closeSectionSidebarDrawer();
+		}
+	};
+
+	#onSidebarDrawerKeydown = (event: KeyboardEvent) => {
+		if (event.key === 'Escape') {
+			this.#backofficeContext?.closeSectionSidebarDrawer();
+		}
+	};
+
+	#onSidebarDrawerBackdropClick = () => {
+		this.#backofficeContext?.closeSectionSidebarDrawer();
+	};
+
 	constructor() {
 		super();
+
+		this._isCompactLayout = this.#compactLayoutQuery.matches;
+
+		this.consumeContext(UMB_BACKOFFICE_CONTEXT, (backofficeContext) => {
+			this.#backofficeContext = backofficeContext;
+			this.observe(
+				backofficeContext?.sectionSidebarDrawerOpen,
+				(open) => {
+					this._sidebarDrawerOpen = open ?? false;
+				},
+				'observeSectionSidebarDrawerOpen',
+			);
+		});
 
 		new UmbExtensionsElementInitializer(this, umbExtensionsRegistry, 'sectionSidebarApp', null, (sidebarApps) => {
 			const oldValue = this._sidebarApps;
@@ -112,23 +170,42 @@ export class UmbDefaultSectionElement extends UmbLitElement implements UmbSectio
 		localStorage.setItem('umb-split-panel-position', position.toString());
 	}
 
+	override connectedCallback() {
+		super.connectedCallback();
+		this.#compactLayoutQuery.addEventListener('change', this.#onCompactLayoutChange);
+	}
+
+	override disconnectedCallback() {
+		super.disconnectedCallback();
+		this.#compactLayoutQuery.removeEventListener('change', this.#onCompactLayoutChange);
+		document.removeEventListener('keydown', this.#onSidebarDrawerKeydown);
+	}
+
+	protected override updated(changedProperties: PropertyValues): void {
+		super.updated(changedProperties);
+		if (!changedProperties.has('_sidebarDrawerOpen')) return;
+
+		if (this._sidebarDrawerOpen) {
+			document.addEventListener('keydown', this.#onSidebarDrawerKeydown);
+			// The drawer leaves its inert/hidden state in this same update; focus only lands once that has been applied.
+			requestAnimationFrame(() => this.shadowRoot?.querySelector<HTMLElement>('#sidebar-drawer')?.focus());
+		} else {
+			document.removeEventListener('keydown', this.#onSidebarDrawerKeydown);
+		}
+	}
+
 	override render() {
+		const hasSidebarApps = !!this._sidebarApps && this._sidebarApps.length > 0;
 		return html`
 			<umb-split-panel
 				lock="start"
 				snap="300px"
 				@position-changed=${this.#onSplitPanelChange}
 				.position=${this._splitPanelPosition}>
-				${this._sidebarApps && this._sidebarApps.length > 0
+				${hasSidebarApps && !this._isCompactLayout
 					? html`
 							<!-- TODO: these extensions should be combined into one type: sectionSidebarApp with a "subtype" -->
-							<umb-section-sidebar slot="start">
-								${repeat(
-									this._sidebarApps,
-									(app) => app.alias,
-									(app) => app.component,
-								)}
-							</umb-section-sidebar>
+							<umb-section-sidebar slot="start">${this.#renderSidebarApps()}</umb-section-sidebar>
 						`
 					: nothing}
 				<umb-section-main slot="end">
@@ -138,6 +215,31 @@ export class UmbDefaultSectionElement extends UmbLitElement implements UmbSectio
 					<slot></slot>
 				</umb-section-main>
 			</umb-split-panel>
+			${hasSidebarApps && this._isCompactLayout ? this.#renderSidebarDrawer() : nothing}
+		`;
+	}
+
+	#renderSidebarApps() {
+		return repeat(
+			this._sidebarApps!,
+			(app) => app.alias,
+			(app) => app.component,
+		);
+	}
+
+	#renderSidebarDrawer() {
+		return html`
+			${this._sidebarDrawerOpen
+				? html`<div id="sidebar-drawer-backdrop" @click=${this.#onSidebarDrawerBackdropClick}></div>`
+				: nothing}
+			<umb-section-sidebar
+				id="sidebar-drawer"
+				tabindex="-1"
+				?open=${this._sidebarDrawerOpen}
+				?inert=${!this._sidebarDrawerOpen}
+				@click=${this.#onSidebarDrawerClick}>
+				${this.#renderSidebarApps()}
+			</umb-section-sidebar>
 		`;
 	}
 
@@ -148,6 +250,44 @@ export class UmbDefaultSectionElement extends UmbLitElement implements UmbSectio
 				flex: 1 1 auto;
 				height: 100%;
 				display: flex;
+				position: relative;
+			}
+
+			#sidebar-drawer-backdrop {
+				position: absolute;
+				inset: 0;
+				z-index: 20;
+				background-color: var(--uui-modal-color-backdrop, rgba(0, 0, 0, 0.5));
+			}
+
+			#sidebar-drawer {
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				left: 0;
+				height: auto;
+				width: min(var(--umb-section-sidebar-width), 85vw);
+				z-index: 21;
+				box-shadow: var(--uui-shadow-depth-3);
+				transform: translateX(-100%);
+				visibility: hidden;
+				transition:
+					transform 160ms ease-out,
+					visibility 0s 160ms;
+			}
+
+			#sidebar-drawer[open] {
+				transform: none;
+				visibility: visible;
+				transition:
+					transform 160ms ease-out,
+					visibility 0s;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				#sidebar-drawer {
+					transition: none;
+				}
 			}
 
 			umb-split-panel {

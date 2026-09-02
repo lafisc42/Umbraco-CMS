@@ -958,6 +958,7 @@ export default {
 		macro: 'Macro',
 		mandatory: 'Mandatory',
 		manifest: 'Manifest',
+		menu: 'Menu',
 		message: 'Message',
 		move: 'Move',
 		name: 'Name',
