@@ -475,6 +475,13 @@ export class UmbAppElement extends UmbLitElement {
 			display: block;
 			width: 100%;
 			height: 100vh;
+			height: 100dvh;
+		}
+
+		@media (max-width: 800px) {
+			:host {
+				min-width: 0;
+			}
 		}
 
 		#loader {

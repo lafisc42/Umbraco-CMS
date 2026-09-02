@@ -208,6 +208,7 @@ export class UmbAuthViewElement extends UmbLitElement {
 				width: 100vw;
 				max-width: 1920px;
 				height: 100vh;
+				height: 100dvh;
 				box-sizing: border-box;
 			}
 
