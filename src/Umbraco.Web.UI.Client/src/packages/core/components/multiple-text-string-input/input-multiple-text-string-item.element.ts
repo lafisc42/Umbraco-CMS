@@ -158,6 +158,11 @@ export class UmbInputMultipleTextStringItemElement extends UUIFormControlWithBas
 					opacity: 1;
 				}
 			}
+			@media (hover: none) {
+				uui-button {
+					opacity: 1;
+				}
+			}
 		`,
 	];
 }

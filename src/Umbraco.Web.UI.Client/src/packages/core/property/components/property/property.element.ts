@@ -520,6 +520,11 @@ export class UmbPropertyElement extends UmbLitElement {
 			#action-menu[open] {
 				opacity: 1;
 			}
+			@media (hover: none) {
+				#action-menu {
+					opacity: 1;
+				}
+			}
 
 			#variant-info {
 				opacity: 0;

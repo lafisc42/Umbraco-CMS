@@ -623,6 +623,11 @@ export class UmbBlockGridEntryElement extends UmbLitElement implements UmbProper
 			:host(:focus-within) {
 				--umb-block-grid-entry-actions-opacity: 1;
 			}
+			@media (hover: none) {
+				:host {
+					--umb-block-grid-entry-actions-opacity: 1;
+				}
+			}
 
 			:host::after {
 				content: '';

@@ -48,9 +48,10 @@ export class UmbHistoryItemElement extends UmbLitElement {
 			:host(:hover) #actions-container {
 				opacity: 1;
 			}
-
-			:host(:hover) #actions-container {
-				opacity: 1;
+			@media (hover: none) {
+				#actions-container {
+					opacity: 1;
+				}
 			}
 
 			.user-info {

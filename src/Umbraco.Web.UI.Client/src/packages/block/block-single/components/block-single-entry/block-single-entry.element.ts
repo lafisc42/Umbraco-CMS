@@ -421,6 +421,11 @@ export class UmbBlockSingleEntryElement extends UmbLitElement implements UmbProp
 			:host(:focus-within) {
 				--umb-block-single-entry-actions-opacity: 1;
 			}
+			@media (hover: none) {
+				:host {
+					--umb-block-single-entry-actions-opacity: 1;
+				}
+			}
 
 			:host::after {
 				content: '';

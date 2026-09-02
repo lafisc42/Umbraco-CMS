@@ -501,6 +501,11 @@ export class UmbContentTypeDesignEditorPropertyElement extends UmbLitElement {
 			#editor:focus-within uui-action-bar {
 				opacity: 1;
 			}
+			@media (hover: none) {
+				#editor uui-action-bar {
+					opacity: 1;
+				}
+			}
 
 			a {
 				color: inherit;

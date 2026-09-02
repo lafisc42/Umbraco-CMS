@@ -130,6 +130,11 @@ export class UmbFigureCardElement extends UUICardElement {
 			:host(:hover) slot[name='actions'] {
 				opacity: 1;
 			}
+			@media (hover: none) {
+				slot[name='actions'] {
+					opacity: 1;
+				}
+			}
 
 			#portrait {
 				display: flex;

@@ -803,6 +803,11 @@ export class UmbContentTypeDesignEditorElement extends UmbLitElement implements 
 				opacity: 0;
 				transition: opacity 100ms;
 			}
+			@media (hover: none) {
+				uui-tab .trash {
+					opacity: 1;
+				}
+			}
 
 			uui-input:not(:focus, :hover, :invalid) {
 				border: 1px solid transparent;
