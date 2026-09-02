@@ -209,4 +209,90 @@ describe('UmbSorterController', () => {
 			expect(element.sorter.getItem('5')).to.be.undefined;
 		});
 	});
+
+	describe('touch pointer reordering', () => {
+		const LONG_PRESS = 350;
+
+		const dispatchPointer = (
+			target: EventTarget,
+			type: string,
+			x: number,
+			y: number,
+			pointerType: 'touch' | 'mouse' = 'touch',
+		) => {
+			target.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					composed: true,
+					cancelable: true,
+					pointerId: 1,
+					pointerType,
+					isPrimary: true,
+					button: 0,
+					buttons: type === 'pointerup' ? 0 : 1,
+					clientX: x,
+					clientY: y,
+				}),
+			);
+		};
+
+		const centerOf = (el: HTMLElement) => {
+			const rect = el.getBoundingClientRect();
+			return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, bottom: rect.bottom };
+		};
+
+		beforeEach(async () => {
+			element.sorter.setModel(['1', '2', '3', '4']);
+			await aTimeout(100);
+		});
+
+		it('moves the pressed item to where the finger is released after a long press', async () => {
+			const [first, , , last] = element.getAllItems();
+			const start = centerOf(first);
+			const end = centerOf(last);
+
+			dispatchPointer(first, 'pointerdown', start.x, start.y);
+			await aTimeout(LONG_PRESS);
+			expect(first.hasAttribute('drag-placeholder'), 'placeholder styling while dragging').to.be.true;
+
+			dispatchPointer(window, 'pointermove', end.x, end.bottom - 2);
+			await aTimeout(50);
+			dispatchPointer(window, 'pointerup', end.x, end.bottom - 2);
+			await aTimeout(50);
+
+			expect(element.sorter.getModel()).to.deep.equal(['2', '3', '4', '1']);
+			expect(first.hasAttribute('drag-placeholder')).to.be.false;
+		});
+
+		it('does not start a drag when the finger moves before the long press completes', async () => {
+			const [first, , , last] = element.getAllItems();
+			const start = centerOf(first);
+			const end = centerOf(last);
+
+			dispatchPointer(first, 'pointerdown', start.x, start.y);
+			await aTimeout(50);
+			dispatchPointer(window, 'pointermove', start.x, start.y + 30);
+			await aTimeout(LONG_PRESS);
+			dispatchPointer(window, 'pointermove', end.x, end.bottom - 2);
+			await aTimeout(50);
+			dispatchPointer(window, 'pointerup', end.x, end.bottom - 2);
+
+			expect(element.sorter.getModel()).to.deep.equal(['1', '2', '3', '4']);
+		});
+
+		it('leaves mouse pointers to the native drag and drop path', async () => {
+			const [first, , , last] = element.getAllItems();
+			const start = centerOf(first);
+			const end = centerOf(last);
+
+			dispatchPointer(first, 'pointerdown', start.x, start.y, 'mouse');
+			await aTimeout(LONG_PRESS);
+			expect(first.hasAttribute('drag-placeholder')).to.be.false;
+			dispatchPointer(window, 'pointermove', end.x, end.bottom - 2, 'mouse');
+			await aTimeout(50);
+			dispatchPointer(window, 'pointerup', end.x, end.bottom - 2, 'mouse');
+
+			expect(element.sorter.getModel()).to.deep.equal(['1', '2', '3', '4']);
+		});
+	});
 });

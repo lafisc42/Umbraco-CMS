@@ -4,6 +4,10 @@ import type { UmbControllerHostElement } from '@umbraco-cms/backoffice/controlle
 
 const autoScrollSensitivity = 50;
 const autoScrollSpeed = 16;
+/** How long a touch or pen pointer must rest on an item before it starts dragging instead of scrolling. */
+const touchDragActivationDelay = 300;
+/** Movement (in px) during the activation delay that is read as a scroll or tap rather than a drag. */
+const touchDragCancelDistance = 8;
 
 /**
  *
@@ -633,6 +637,7 @@ export class UmbSorterController<T, ElementType extends HTMLElement = HTMLElemen
 			const draggableElement = this.#getDraggableElement(element);
 			const handleElement = this.#getHandleElement(element);
 			handleElement.addEventListener('mousedown', this.#handleHandleMouseDown);
+			handleElement.addEventListener('pointerdown', this.#handleHandlePointerDown);
 			// Will be set to true by the 'mousedown' event if approved:
 			(draggableElement as HTMLElement).draggable = false;
 			draggableElement.addEventListener('dragstart', this.#handleDragStart);
@@ -665,6 +670,7 @@ export class UmbSorterController<T, ElementType extends HTMLElement = HTMLElemen
 
 		const handleElement = this.#getHandleElement(element);
 		handleElement.removeEventListener('mousedown', this.#handleHandleMouseDown);
+		handleElement.removeEventListener('pointerdown', this.#handleHandlePointerDown);
 
 		(draggableElement as HTMLElement).draggable = false;
 
@@ -704,27 +710,28 @@ export class UmbSorterController<T, ElementType extends HTMLElement = HTMLElemen
 		this.#setupPlaceholderStyle();
 	}
 
-	#handleHandleMouseDown = (event: MouseEvent) => {
+	#isIgnoredTarget(event: Event): boolean {
+		if (!this.#config.ignorerSelector) return false;
+
 		const target = event.target as HTMLElement;
+		if (target.matches(this.#config.ignorerSelector)) {
+			return true;
+		}
+		// filter composedPath for only elements descending from the event.target:
 		const composedPath = event.composedPath();
+		const index = composedPath.indexOf(target);
+		const composedPathBelowTarget = index !== -1 ? composedPath.slice(0, index) : undefined;
 
-		// Test for a match with the ignore selectors:
-		if (this.#config.ignorerSelector) {
-			if (target.matches(this.#config.ignorerSelector)) {
-				return;
-			}
-			// filter composedPath for only elements descending from the event.target:
-			const index = composedPath.indexOf(target);
-			const composedPathBelowTarget = index !== -1 ? composedPath.slice(0, index) : undefined;
+		return (
+			composedPathBelowTarget?.some((x) =>
+				(x as HTMLElement).matches?.('[draggable="false"],' + this.#config.ignorerSelector),
+			) ?? false
+		);
+	}
 
-			if (composedPathBelowTarget) {
-				const ignoreThis = composedPathBelowTarget.some((x) =>
-					(x as HTMLElement).matches?.('[draggable="false"],' + this.#config.ignorerSelector),
-				);
-				if (ignoreThis) {
-					return;
-				}
-			}
+	#handleHandleMouseDown = (event: MouseEvent) => {
+		if (this.#isIgnoredTarget(event)) {
+			return;
 		}
 
 		if (event.target && event.button === 0) {
@@ -745,6 +752,152 @@ export class UmbSorterController<T, ElementType extends HTMLElement = HTMLElemen
 			target.draggable = false;
 		}
 	};
+
+	/**
+	 * Touch and pen pointers cannot use native drag and drop, so they get a long-press pointer path instead.
+	 * The pointer path reorders within this sorter and reuses the shared placement and move-end logic.
+	 * Pointer-down events already claimed by a nested sorter are left alone, so the innermost item wins.
+	 */
+	static #claimedPointerDowns = new WeakSet<Event>();
+
+	#touchDrag?: {
+		pointerId: number;
+		element: ElementType;
+		startX: number;
+		startY: number;
+		activationTimer?: number;
+		active: boolean;
+	};
+
+	#handleHandlePointerDown = (event: PointerEvent) => {
+		if (event.pointerType === 'mouse' || !event.isPrimary || event.button !== 0) return;
+		if (UmbSorterController.#claimedPointerDowns.has(event)) return;
+		if (this.#isIgnoredTarget(event)) return;
+
+		const element = this.#getElement(event.target as HTMLElement) as ElementType | null;
+		if (!element) return;
+
+		UmbSorterController.#claimedPointerDowns.add(event);
+		this.#cancelTouchDrag();
+
+		// A long press would otherwise select text or open the callout/context menu on the pressed item.
+		element.style.setProperty('-webkit-user-select', 'none');
+		element.style.setProperty('user-select', 'none');
+		element.style.setProperty('-webkit-touch-callout', 'none');
+
+		this.#touchDrag = {
+			pointerId: event.pointerId,
+			element,
+			startX: event.clientX,
+			startY: event.clientY,
+			active: false,
+			activationTimer: window.setTimeout(this.#activateTouchDrag, touchDragActivationDelay),
+		};
+
+		window.addEventListener('pointermove', this.#handleTouchPointerMove, { passive: true });
+		window.addEventListener('pointerup', this.#handleTouchPointerUp);
+		window.addEventListener('pointercancel', this.#handleTouchPointerUp);
+		window.addEventListener('contextmenu', this.#preventDefault, { capture: true });
+	};
+
+	#activateTouchDrag = () => {
+		const touchDrag = this.#touchDrag;
+		if (!touchDrag || touchDrag.active) return;
+		touchDrag.activationTimer = undefined;
+
+		if (!this.#startTouchMove(touchDrag.element)) {
+			this.#cancelTouchDrag();
+			return;
+		}
+
+		touchDrag.active = true;
+		this.#dragX = touchDrag.startX;
+		this.#dragY = touchDrag.startY;
+		// Scrolling has not started yet after a still long press; keep it that way while the item is being dragged.
+		window.addEventListener('touchmove', this.#preventDefault, { passive: false });
+	};
+
+	#startTouchMove(element: ElementType): boolean {
+		if (UmbSorterController.activeElement && UmbSorterController.activeElement !== element) {
+			this.#handleDragEnd();
+		}
+
+		if (!this.#scrollElement) {
+			this.#scrollElement = getParentScrollElement(this.#containerElement, true);
+		}
+
+		this.#containerElement.style.minHeight = this.#containerElement.getBoundingClientRect().height + 'px';
+		this.#setCurrentElement(element);
+
+		const item = this.getItemOfElement(element);
+		if (!item) {
+			this.#handleMoveEnd();
+			return false;
+		}
+		UmbSorterController.activeItem = item;
+
+		const activeUnique = this.#config.getUniqueOfModel(item);
+		UmbSorterController.originalSorter = this as unknown as UmbSorterController<unknown>;
+		UmbSorterController.originalIndex = this.#model.findIndex((x) => this.#config.getUniqueOfModel(x) === activeUnique);
+		UmbSorterController.activeIndex = UmbSorterController.originalIndex;
+
+		this.#config.onStart?.({ item, element });
+
+		UmbSorterController.activeSorter = this as unknown as UmbSorterController<unknown>;
+		UmbSorterController.dropSorter = this as unknown as UmbSorterController<unknown>;
+		return true;
+	}
+
+	#handleTouchPointerMove = (event: PointerEvent) => {
+		const touchDrag = this.#touchDrag;
+		if (!touchDrag || event.pointerId !== touchDrag.pointerId) return;
+
+		if (!touchDrag.active) {
+			const distance = Math.hypot(event.clientX - touchDrag.startX, event.clientY - touchDrag.startY);
+			if (distance > touchDragCancelDistance) {
+				this.#cancelTouchDrag();
+			}
+			return;
+		}
+
+		this.#handleDragMove(event as unknown as DragEvent);
+	};
+
+	#handleTouchPointerUp = (event: PointerEvent) => {
+		const touchDrag = this.#touchDrag;
+		if (!touchDrag || event.pointerId !== touchDrag.pointerId) return;
+
+		const wasActive = touchDrag.active;
+		this.#cancelTouchDrag();
+		if (wasActive) {
+			this.#handleMoveEnd();
+		}
+	};
+
+	#preventDefault = (event: Event) => {
+		if (event.cancelable) {
+			event.preventDefault();
+		}
+	};
+
+	#cancelTouchDrag() {
+		const touchDrag = this.#touchDrag;
+		if (!touchDrag) return;
+
+		if (touchDrag.activationTimer !== undefined) {
+			clearTimeout(touchDrag.activationTimer);
+		}
+		touchDrag.element.style.removeProperty('-webkit-user-select');
+		touchDrag.element.style.removeProperty('user-select');
+		touchDrag.element.style.removeProperty('-webkit-touch-callout');
+
+		window.removeEventListener('pointermove', this.#handleTouchPointerMove);
+		window.removeEventListener('pointerup', this.#handleTouchPointerUp);
+		window.removeEventListener('pointercancel', this.#handleTouchPointerUp);
+		window.removeEventListener('contextmenu', this.#preventDefault, { capture: true });
+		window.removeEventListener('touchmove', this.#preventDefault);
+		this.#touchDrag = undefined;
+	}
 
 	#handleDragStart = (event: DragEvent) => {
 		const element = (event.target as HTMLElement).closest(this.#config.itemSelector) as HTMLElement | null;
@@ -913,6 +1066,9 @@ export class UmbSorterController<T, ElementType extends HTMLElement = HTMLElemen
 	}
 
 	#cleanupMove() {
+		if (this.#touchDrag?.active) {
+			this.#cancelTouchDrag();
+		}
 		if (this.#containerElement) {
 			this.#containerElement.style.minHeight = '';
 		}
