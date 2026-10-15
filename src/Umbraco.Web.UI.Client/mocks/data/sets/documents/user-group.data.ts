@@ -32,6 +32,7 @@ export const data: Array<UmbMockUserGroupModel> = [
 		permissions: [],
 		sections: [
 			'Umb.Section.Content',
+			'Example.Section.MobileContent',
 			'Umb.Section.Media',
 			'Umb.Section.Settings',
 			'Umb.Section.Members',

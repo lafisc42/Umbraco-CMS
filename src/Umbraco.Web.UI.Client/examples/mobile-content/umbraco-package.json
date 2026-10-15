@@ -1,0 +1,14 @@
+{
+	"$schema": "../../umbraco-package-schema.json",
+	"name": "Example Mobile Content",
+	"version": "0.1.0",
+	"allowPublicAccess": false,
+	"extensions": [
+		{
+			"type": "bundle",
+			"alias": "Example.Bundle.MobileContent",
+			"name": "Mobile Content Bundle",
+			"js": "/App_Plugins/MobileContent/mobile-content.js"
+		}
+	]
+}
