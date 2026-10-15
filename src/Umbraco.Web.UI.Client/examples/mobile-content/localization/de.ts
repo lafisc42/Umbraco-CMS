@@ -1,6 +1,5 @@
 export default {
 	exampleMobileContent: {
-		sectionLabel: 'Mobil',
 		root: 'Inhalt',
 		back: 'Zurück',
 		edit: 'Bearbeiten',
